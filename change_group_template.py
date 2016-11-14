@@ -14,6 +14,22 @@ import random, string
 def randomword(length):
    return ''.join(random.choice(string.lowercase) for i in range(length))
 
+def get_image(compute, project, imageName):
+
+    return compute.images().get(project=project, image=imageName).execute()
+
+def get_instanceTemplate(compute, project, instanceTemplate):
+
+    return compute.instanceTemplates().get(project=project, instanceTemplate=instanceTemplate).execute()
+
+def get_instanceGroupManager(compute, project, zone, instanceGroup):
+
+    return compute.instanceGroupManagers().get(project=project, zone=zone, instanceGroupManager=instanceGroup).execute()
+
+def get_instanceGroup(compute, project, zone, instanceGroup):
+
+    return compute.instanceGroups().get(project=project, zone=zone, instanceGroup=instanceGroup).execute()
+
 def get_snapshot(compute, project, snapshot_name):
 
     return compute.snapshots().get(project=project, snapshot=snapshot_name).execute()
@@ -21,6 +37,26 @@ def get_snapshot(compute, project, snapshot_name):
 def get_disk(compute, project, zone, disk):
 
     return compute.disks().get(project=project, zone=zone, disk=disk).execute()
+
+def change_instanceGroup_Template(compute, project, zone, instanceGroup, instanceTemplate):
+
+    config = {
+        'instanceTemplate': instanceTemplate
+    }
+
+    return compute.instanceGroupManagers().setInstanceTemplate(
+        project=project, 
+        zone=zone, 
+        instanceGroupManager=instanceGroup, 
+        body=config).execute()
+
+def copy_instance_template(compute, project, instanceTemplateObj):
+
+    config = instanceTemplateObj
+
+    return compute.instanceTemplates().insert(
+        project=project,
+        body=config).execute()
 
 def create_image(compute, project, diskObj):
 
@@ -87,28 +123,48 @@ def wait_for_operation(compute, project, zone, operation):
 # [END wait_for_operation]
 
 # [START run]
-def main (project, zone, disk, wait=True):
+def main (project, zone, disk, instanceGroup, wait=True):
     credentials = GoogleCredentials.get_application_default()
     compute = discovery.build('compute', 'v1', credentials=credentials)
 
-    print('Creating snapshot from disk ' + disk)
-    snapshot_name = disk + '-' + randomword(8)  + '-tmp'
-    operation = create_snapshot(compute, project, zone, disk, snapshot_name)
-    wait_for_operation(compute, project, zone, operation['name'])
-
-    #snapshot_name = 'test-li4l-wudzsrjv-tmp'
+#    print('Creating snapshot from disk ' + disk)
+#    randomName = randomword(8)
+#    snapshot_name = disk + '-' + randomName  + '-tmp'
+#    operation = create_snapshot(compute, project, zone, disk, snapshot_name)
+#    wait_for_operation(compute, project, zone, operation['name'])
+#
+    randomName = 'eaevwksh'
+    snapshot_name = 'test-li4l-eaevwksh-tmp'
     snapshotObj = get_snapshot(compute, project, snapshot_name)
-    print('Creating disk from snapshot ' + snapshot_name)
-    operation = create_disk(compute, project, zone, disk, snapshotObj)
-    wait_for_operation(compute, project, zone, operation['name'])
-
+#    print('Creating disk from snapshot ' + snapshot_name)
+#    operation = create_disk(compute, project, zone, disk, snapshotObj)
+#    wait_for_operation(compute, project, zone, operation['name'])
+#
     diskObj = get_disk(compute, project, zone, snapshotObj['name'])
-#    pprint(diskObj)
-    print('Creating image from disk ' + diskObj['name'])
-    operation = create_image(compute, project, diskObj)
-#    pprint(operation)
+##    pprint(diskObj)
+#    print('Creating image from disk ' + diskObj['name'])
+#    operation = create_image(compute, project, diskObj)
+#    wait_for_operation(compute, project, 'global', operation['name'])
+    imageObj = get_image(compute, project, diskObj['name'])
+
+    instanceGroupManagerObj = get_instanceGroupManager(compute, project, zone, instanceGroup)
+
+    instanceTemplateObj = get_instanceTemplate(compute, project, instanceGroupManagerObj['baseInstanceName'])
+    instanceTemplateObj['properties']['disks'][0]['initializeParams']['sourceImage'] = imageObj['selfLink']
+    instanceTemplateObj['name'] = instanceTemplateObj['name'] + '-' + randomName  + '-tmp'
+
+    operation = copy_instance_template(compute, project, instanceTemplateObj)
     wait_for_operation(compute, project, 'global', operation['name'])
-    #pprint(compute.zoneOperations().list(project=project, zone=zone).execute())
+
+    instanceTemplateObj = get_instanceTemplate(compute, project, instanceTemplateObj['name'])
+
+    print instanceTemplateObj['selfLink']
+    operation = change_instanceGroup_Template(compute, project, zone, instanceGroup, instanceTemplateObj['selfLink'])
+    wait_for_operation(compute, project, zone, operation['name'])
+    pprint(operation)
+
+#gcloud compute --project "advance-state-858" instance-groups managed recreate-instances  "test" --zone "europe-west1-d" --instance "test-li4l"
+#InstanceGroupManagers: recreateInstances
 
     print('DONE')
 
@@ -126,5 +182,5 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    main(args.project_id, args.zone, args.disk)
+    main(args.project_id, args.zone, args.disk, args.instance_group)
 # [END run]
