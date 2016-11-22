@@ -127,38 +127,37 @@ def main (project, zone, disk, instanceGroup, wait=True):
     credentials = GoogleCredentials.get_application_default()
     compute = discovery.build('compute', 'v1', credentials=credentials)
 
-#    print('Creating snapshot from disk ' + disk)
-#    randomName = randomword(8)
-#    snapshot_name = disk + '-' + randomName  + '-tmp'
-#    operation = create_snapshot(compute, project, zone, disk, snapshot_name)
-#    wait_for_operation(compute, project, zone, operation['name'])
-#
-    randomName = 'eaevwksh'
-    snapshot_name = 'test-li4l-eaevwksh-tmp'
+    print('Creating snapshot from disk ' + disk)
+    randomName = randomword(8)
+    snapshot_name = disk + '-' + randomName  + '-tmp'
+    operation = create_snapshot(compute, project, zone, disk, snapshot_name)
+    wait_for_operation(compute, project, zone, operation['name'])
+
     snapshotObj = get_snapshot(compute, project, snapshot_name)
-#    print('Creating disk from snapshot ' + snapshot_name)
-#    operation = create_disk(compute, project, zone, disk, snapshotObj)
-#    wait_for_operation(compute, project, zone, operation['name'])
-#
+    print('Creating disk from snapshot ' + snapshot_name)
+    operation = create_disk(compute, project, zone, disk, snapshotObj)
+    wait_for_operation(compute, project, zone, operation['name'])
+
     diskObj = get_disk(compute, project, zone, snapshotObj['name'])
-##    pprint(diskObj)
-#    print('Creating image from disk ' + diskObj['name'])
-#    operation = create_image(compute, project, diskObj)
-#    wait_for_operation(compute, project, 'global', operation['name'])
+    print('Creating image from disk ' + diskObj['name'])
+    operation = create_image(compute, project, diskObj)
+    wait_for_operation(compute, project, 'global', operation['name'])
     imageObj = get_image(compute, project, diskObj['name'])
 
     instanceGroupManagerObj = get_instanceGroupManager(compute, project, zone, instanceGroup)
 
-    instanceTemplateObj = get_instanceTemplate(compute, project, instanceGroupManagerObj['baseInstanceName'])
+    templateName = instanceGroupManagerObj['instanceTemplate'].rpartition('/instanceTemplates/')[2]
+    instanceTemplateObj = get_instanceTemplate(compute, project, templateName)
     instanceTemplateObj['properties']['disks'][0]['initializeParams']['sourceImage'] = imageObj['selfLink']
     instanceTemplateObj['name'] = instanceTemplateObj['name'] + '-' + randomName  + '-tmp'
 
+    print('Copying instance template')
     operation = copy_instance_template(compute, project, instanceTemplateObj)
     wait_for_operation(compute, project, 'global', operation['name'])
 
     instanceTemplateObj = get_instanceTemplate(compute, project, instanceTemplateObj['name'])
 
-    print instanceTemplateObj['selfLink']
+    print('Changing instance Template Group')
     operation = change_instanceGroup_Template(compute, project, zone, instanceGroup, instanceTemplateObj['selfLink'])
     wait_for_operation(compute, project, zone, operation['name'])
     pprint(operation)
