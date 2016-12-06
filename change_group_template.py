@@ -72,9 +72,11 @@ def create_image(compute, project, diskObj):
 
 def create_disk(compute, project, zone, disk, snapshotObj):
 
+    sourceSnapshot = snapshotObj['selfLink'].rpartition('https://www.googleapis.com/compute/v1/')[2]
+    
     config = {
         'name': snapshotObj['name'],
-        'sourceSnapshotId': snapshotObj['name'],
+        'sourceSnapshot': sourceSnapshot,
         'sizeGb': snapshotObj['diskSizeGb']
         
     }
@@ -160,10 +162,10 @@ def main (project, zone, disk, instanceGroup, wait=True):
     print('Changing instance Template Group')
     operation = change_instanceGroup_Template(compute, project, zone, instanceGroup, instanceTemplateObj['selfLink'])
     wait_for_operation(compute, project, zone, operation['name'])
-    pprint(operation)
 
 #gcloud compute --project "advance-state-858" instance-groups managed recreate-instances  "test" --zone "europe-west1-d" --instance "test-li4l"
 #InstanceGroupManagers: recreateInstances
+#gcloud compute --project "mobile-bakery-aubaid" instance-groups managed recreate-instances  "aubaid-elastic-frontend" --zone "europe-west1-d" --instance "aubaid-elastic-frontend-x5t0"
 
     print('DONE')
 
