@@ -163,9 +163,8 @@ def main (project, zone, disk, instanceGroup, wait=True):
     operation = change_instanceGroup_Template(compute, project, zone, instanceGroup, instanceTemplateObj['selfLink'])
     wait_for_operation(compute, project, zone, operation['name'])
 
-#gcloud compute --project "advance-state-858" instance-groups managed recreate-instances  "test" --zone "europe-west1-d" --instance "test-li4l"
-#InstanceGroupManagers: recreateInstances
-#gcloud compute --project "mobile-bakery-aubaid" instance-groups managed recreate-instances  "aubaid-elastic-frontend" --zone "europe-west1-d" --instance "aubaid-elastic-frontend-x5t0"
+    print('Final Step: Recreate instances')
+    print('gcloud compute --project "project-name" instance-groups managed recreate-instances  "instance_group" --zone "europe-west1-d" --instance "instance_name"')
 
     print('DONE')
 
