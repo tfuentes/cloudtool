@@ -11,9 +11,6 @@ from oauth2client.client import GoogleCredentials
 
 import random, string
 
-def randomword(length):
-   return ''.join(random.choice(string.lowercase) for i in range(length))
-
 def get_image(compute, project, imageName):
 
     return compute.images().get(project=project, image=imageName).execute()
@@ -100,6 +97,17 @@ def create_snapshot(compute, project, zone, disk, snapshot_name):
         body=config).execute()
 # [END create snapshot]
 
+# [START delete snapshot]
+def delete_snapshot(compute, project, snapshot_name):
+
+    return compute.snapshots().delete(project=project, snapshot=snapshot_name).execute()
+# [END delete snapshot]
+
+# [START delete disk]
+def delete_disk(compute, project, zone, disk):
+    return compute.disks().delete(project=project, zone=zone, disk=disk).execute()
+# [START delete disk]
+
 # [START wait_for_operation]
 def wait_for_operation(compute, project, zone, operation):
     print('Waiting for operation to finish...')
@@ -128,10 +136,10 @@ def wait_for_operation(compute, project, zone, operation):
 def main (project, zone, disk, instanceGroup, wait=True):
     credentials = GoogleCredentials.get_application_default()
     compute = discovery.build('compute', 'v1', credentials=credentials)
-
+   
     print('Creating snapshot from disk ' + disk)
-    randomName = randomword(8)
-    snapshot_name = disk + '-' + randomName  + '-tmp'
+    timeStamp = str(int(time.time()))
+    snapshot_name = disk + '-' + timeStamp  + '-tmp'
     operation = create_snapshot(compute, project, zone, disk, snapshot_name)
     wait_for_operation(compute, project, zone, operation['name'])
 
@@ -140,18 +148,26 @@ def main (project, zone, disk, instanceGroup, wait=True):
     operation = create_disk(compute, project, zone, disk, snapshotObj)
     wait_for_operation(compute, project, zone, operation['name'])
 
+    print('Deleting snapshot ' + snapshot_name)
+    operation = delete_snapshot(compute, project, snapshot_name)
+    wait_for_operation(compute, project, 'global', operation['name'])
+
     diskObj = get_disk(compute, project, zone, snapshotObj['name'])
     print('Creating image from disk ' + diskObj['name'])
     operation = create_image(compute, project, diskObj)
     wait_for_operation(compute, project, 'global', operation['name'])
     imageObj = get_image(compute, project, diskObj['name'])
 
+    print('Deleting disk ' + diskObj['name'])
+    operation = delete_disk(compute, project, zone, snapshotObj['name'])
+    wait_for_operation(compute, project, zone , operation['name'])
+
     instanceGroupManagerObj = get_instanceGroupManager(compute, project, zone, instanceGroup)
 
     templateName = instanceGroupManagerObj['instanceTemplate'].rpartition('/instanceTemplates/')[2]
     instanceTemplateObj = get_instanceTemplate(compute, project, templateName)
     instanceTemplateObj['properties']['disks'][0]['initializeParams']['sourceImage'] = imageObj['selfLink']
-    instanceTemplateObj['name'] = instanceTemplateObj['name'] + '-' + randomName  + '-tmp'
+    instanceTemplateObj['name'] = instanceTemplateObj['name'] + '-' + timeStamp  + '-tmp'
 
     print('Copying instance template')
     operation = copy_instance_template(compute, project, instanceTemplateObj)
@@ -165,22 +181,19 @@ def main (project, zone, disk, instanceGroup, wait=True):
 
     print('Final Step: Recreate instances')
     print('gcloud compute --project "project-name" instance-groups managed recreate-instances  "instance_group" --zone "europe-west1-d" --instance "instance_name"')
-
+    
     print('DONE')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description =__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('project_id', help='Your Google Cloud project ID.')
-    parser.add_argument('disk', help='Disk to generate the image template.')
-    parser.add_argument('instance_group', help='Instance Group to substitute the image.')
-    parser.add_argument(
-        '--zone',
-        default='europe-west1-d',
-        help='Compute Engine zone to deploy to.')
-
+    parser.add_argument('-p', '--project_id', help='Your Google Cloud project ID.', required=True)
+    parser.add_argument('-d', '--disk', help='Disk to generate the image template.', required=True)
+    parser.add_argument('--instance_group', help='Instance Group to substitute the image.', required=True)
+    parser.add_argument('--zone', default='europe-west1-d', help='Compute Engine zone to deploy to.')
     args = parser.parse_args()
 
     main(args.project_id, args.zone, args.disk, args.instance_group)
+
 # [END run]
